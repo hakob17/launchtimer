@@ -1,0 +1,8 @@
+{
+  "name": "launchtimer-api",
+  "private": true,
+  "type": "module",
+  "scripts": { "deploy": "wrangler deploy", "test": "node test.mjs" },
+  "dependencies": { "@peculiar/x509": "^1.12.3", "cbor-x": "^1.6.0" },
+  "devDependencies": { "wrangler": "^4.0.0" }
+}

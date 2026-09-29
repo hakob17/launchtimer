@@ -90,6 +90,8 @@ struct RunDetailView: View {
                 Text(run.kind == .braking ? "Braking" : "Times")
             }
 
+            PostRunSection(run: run)
+
             Section("Speed") {
                 Chart {
                     ForEach(Array(run.trace.enumerated()), id: \.offset) { _, point in

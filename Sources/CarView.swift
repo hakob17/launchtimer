@@ -59,6 +59,7 @@ struct CarView: View {
 
 struct SettingsView: View {
     @EnvironmentObject private var model: AppModel
+    @EnvironmentObject private var board: Leaderboard
 
     var body: some View {
         NavigationStack {
@@ -74,6 +75,26 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    NavigationLink {
+                        CarPickerView()
+                    } label: {
+                        LabeledContent("Your car", value: board.car?.title ?? "Choose")
+                    }
+                    HStack {
+                        LabeledContent("Driver name", value: board.handle)
+                        Button("New") { board.newHandle() }.buttonStyle(.bordered)
+                    }
+                    Toggle("Post runs automatically", isOn: $board.autoPost)
+                        .disabled(board.car == nil || !board.acceptedTerms)
+                } header: {
+                    Text("Leaderboard")
+                } footer: {
+                    Text(board.acceptedTerms
+                         ? "New runs go on the leaderboard as soon as they're saved. Driver names are generated so boards stay friendly."
+                         : "Post a run once from its details to turn this on. Driver names are generated so boards stay friendly.")
+                }
+
+                Section {
                     Button {
                         model.demoRunning ? model.endDemo() : model.playDemo()
                     } label: {
@@ -84,11 +105,12 @@ struct SettingsView: View {
                 }
 
                 Section("About") {
-                    Text("Launch Timer uses the iPhone's GPS, motion sensors and barometer. Your runs stay on this phone.")
+                    Text("Launch Timer uses the iPhone's GPS, motion sensors and barometer. Runs stay on this phone unless you post them to the leaderboard.")
                         .font(.subheadline).foregroundStyle(.secondary)
                     Link("Privacy policy", destination: URL(string: "https://hakob17.github.io/launchtimer/privacy.html")!)
                     Text("Only time runs on a closed course or drag strip.")
                         .font(.subheadline).foregroundStyle(.secondary)
+                    Link("Report a problem", destination: URL(string: "https://github.com/hakob17/launchtimer/issues")!)
                 }
             }
             .navigationTitle("Settings")

@@ -37,3 +37,16 @@ The phone sends small JSON messages (`live` 10×/s, `runs`) through the HotspotN
 ```
 xcodegen generate && open LaunchTimer.xcodeproj
 ```
+
+## Leaderboard
+
+`api/` is a Cloudflare Worker with a D1 database (`launchtimer-api.hakob-hakobyan173.workers.dev`).
+The server recomputes every posted time from the run's speed trace, refuses physically impossible
+runs, slopes over 1% and demo runs, and marks posts signed with an Apple App Attest key as verified.
+Driver names are generated; car makes/models come from NHTSA's vPIC; entries can be reported
+(hidden after 3 reports) and hidden per device.
+
+```
+cd api && npx wrangler d1 migrations apply launchtimer --local && node test.mjs && node test-attest.mjs
+npx wrangler deploy
+```

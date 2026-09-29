@@ -27,8 +27,24 @@
   sent to the developer.</p>
 
   <h2>Your runs</h2>
-  <p>Runs are saved on your iPhone only. You can delete any run in the app, or all of them by
-  deleting the app.</p>
+  <p>Runs are saved on your iPhone only, unless you post them to the leaderboard. You can delete
+  any run in the app, or all of them by deleting the app.</p>
+
+  <h2>Leaderboard</h2>
+  <p>Posting is optional and happens only when you tap <b>Post to leaderboard</b> or turn on
+  automatic posting. A post sends, to the Launch Timer server on Cloudflare:</p>
+  <ul>
+    <li>the run's times and its speed-over-time trace, so the server can check them;</li>
+    <li>the car you chose (year, make, model, trim);</li>
+    <li>your generated driver name (like “Crimson Falcon 42”) and a random ID made by the app;</li>
+    <li>your country, from your iPhone's region setting.</li>
+  </ul>
+  <p>Your location is never sent. The times, car, driver name and country are shown publicly on
+  the leaderboard. To check that posts come from the real app, the app uses Apple's App Attest,
+  which gives the server a device key that doesn't identify you. To remove your results, open an
+  issue with your driver name at the address below.</p>
+  <p>Car makes and models are looked up from the US NHTSA vehicle database, which receives the
+  make and year you choose and your IP address.</p>
 
   <h2>Car screen</h2>
   <p>When the car page is paired with your phone's 8-character code, the app sends the live

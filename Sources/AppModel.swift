@@ -41,6 +41,11 @@ final class AppModel: ObservableObject {
         didSet { UserDefaults.standard.set(acceptedSafety, forKey: "acceptedSafety") }
     }
 
+    /// Called with each saved run (the leaderboard's auto-post).
+    var onRunSaved: ((RunResult) -> Void)?
+    /// Leaderboard ranks for a run id, for the car screen.
+    var ranks: ((String) -> [PostedResult]?)?
+
     private let sensors = Sensors()
     private let link = CarLink()
     /// Only touched on `sensors.queue`.
@@ -125,6 +130,7 @@ final class AppModel: ObservableObject {
         latestRun = run
         RunStore.save(runs)
         pushRunsToCar()
+        onRunSaved?(run)
     }
 
     func delete(_ run: RunResult) {
@@ -220,9 +226,9 @@ final class AppModel: ObservableObject {
         return state.liveSplits.mapValues { max(0, $0 - rollout) }
     }
 
-    private func pushRunsToCar() {
+    func pushRunsToCar() {
         guard carsWatching > 0 else { return }
-        let recent = runs.prefix(12).map { CarFormat.run($0) }
+        let recent = runs.prefix(12).map { CarFormat.run($0, ranks: ranks?($0.id.uuidString)) }
         link.send(["type": "runs", "units": units.rawValue, "rollout": showRollout,
                    "latest": latestRun?.id.uuidString ?? "", "runs": Array(recent)])
     }
@@ -250,7 +256,7 @@ private func round2(_ x: Double) -> Double { (x * 100).rounded() / 100 }
 
 /// Runs in the shape the car page reads.
 enum CarFormat {
-    static func run(_ run: RunResult) -> [String: Any] {
+    static func run(_ run: RunResult, ranks: [PostedResult]? = nil) -> [String: Any] {
         var out: [String: Any] = [
             "id": run.id.uuidString, "kind": run.kind.rawValue, "date": run.date.timeIntervalSince1970 * 1000,
             "maxSpeed": round2(run.maxSpeed), "peakG": round2(run.peakG), "distance": round2(run.distance),
@@ -270,6 +276,11 @@ enum CarFormat {
             },
         ]
         if let grade = run.grade { out["grade"] = (grade * 1000).rounded() / 1000 }
+        if let ranks {
+            out["ranks"] = Dictionary(uniqueKeysWithValues: ranks.map {
+                ($0.metric, ["rank": $0.overall.rank, "of": $0.overall.of, "modelRank": $0.model.rank, "modelOf": $0.model.of])
+            })
+        }
         return out
     }
 }

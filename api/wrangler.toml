@@ -1,0 +1,10 @@
+name = "launchtimer-api"
+main = "src/index.js"
+compatibility_date = "2026-05-01"
+compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "launchtimer"
+database_id = "0bdca7e8-5ba1-4f62-b285-202e957b93aa"
+migrations_dir = "migrations"

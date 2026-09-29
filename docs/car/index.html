@@ -35,6 +35,8 @@
   #timer { font-size: 110px; font-weight: 800; color: var(--accent); margin-top: 18px; font-family: ui-monospace, "SF Mono", Menlo, monospace;
     min-height: 1.1em; }
   #timerLabel { font-size: 22px; color: var(--dim); min-height: 1.3em; }
+  #rank { text-align: center; margin-top: 16px; font-size: 30px; font-weight: 700; color: #ffd48a; min-height: 1.2em; }
+  #rank small { display: block; font-size: 20px; color: var(--dim); font-weight: 500; margin-top: 4px; }
 
   #gPanel { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; }
   #gmeter { width: 100%; max-width: 560px; aspect-ratio: 1; }
@@ -114,6 +116,7 @@
     <div id="unit">mph</div>
     <div id="timer" class="num"></div>
     <div id="timerLabel"></div>
+    <div id="rank"></div>
   </section>
 
   <section class="panel" id="gPanel">
@@ -241,10 +244,23 @@
       $('timer').textContent = head ? fmtT(timeOf(head)) : '';
       $('timerLabel').textContent = head ? head.label + (detailOf(head) ? ' · ' + detailOf(head) : '') : '';
     }
+    $('rank').innerHTML = live.phase === 'running' ? '' : rankLine(runs.find(r => r.id === latestId));
     trail.push([live.lon, live.lat]);
     if (trail.length > 30) trail.shift();
     drawG(live.lon, live.lat);
     renderTiles();
+  }
+
+  // Leaderboard boards and the split each is read from; US launch boards use the rollout time.
+  const BOARD_OF = { '0-60mph': '0–60 mph', '0-100kmh': '0–100 km/h', quarter: '¼ mile', '60-130mph': '60–130 mph', '100-200kmh': '100–200 km/h', '60-0mph': '60–0 mph' };
+  function rankLine(run) {
+    if (!run || !run.ranks) return '';
+    const order = units === 'imperial' ? ['0-60mph', 'quarter', '60-130mph', '60-0mph', '0-100kmh', '100-200kmh']
+                                       : ['0-100kmh', '100-200kmh', '0-60mph', 'quarter', '60-130mph', '60-0mph'];
+    const id = order.find(k => run.ranks[k]);
+    if (!id) return '';
+    const r = run.ranks[id];
+    return `🏆 #${r.rank} of ${r.of} · ${BOARD_OF[id]}<small>#${r.modelRank} of ${r.modelOf} for this model</small>`;
   }
 
   function headline(run) {
@@ -371,6 +387,9 @@
     });
     if (run.kind !== 'braking') rows.push(`<tr><td>Top speed</td><td class="num">${Math.round(spd(run.maxSpeed))} ${unitLabel()}</td></tr>`);
     rows.push(`<tr><td>${run.kind === 'braking' ? 'Peak braking' : 'Peak acceleration'}</td><td class="num">${run.peakG.toFixed(2)} g</td></tr>`);
+    for (const [id, r] of Object.entries(run.ranks || {})) {
+      rows.push(`<tr><td>Leaderboard · ${BOARD_OF[id] || id}<div class="sub">#${r.modelRank} of ${r.modelOf} for this model</div></td><td class="num">#${r.rank} of ${r.of}</td></tr>`);
+    }
     $('detailTable').innerHTML = rows.join('');
     $('detailWarn').innerHTML = run.grade != null && Math.abs(run.grade) > 0.01
       ? `<div class="warn">⚠︎ ${(Math.abs(run.grade) * 100).toFixed(1)}% ${run.grade < 0 ? 'downhill' : 'uphill'} — not comparable with flat runs</div>` : '';
@@ -475,6 +494,7 @@
     const res = (id, label, time, extra = {}) => Object.assign({ id, label, kind: 'speed', time }, extra);
     runs = [
       { id: 'a', kind: 'launch', date: Date.now() - 60000, maxSpeed: 52.5, peakG: 0.97, distance: 390, source: 'iPhone', grade: 0.002, trace,
+        ranks: { '0-60mph': { rank: 14, of: 312, modelRank: 3, modelOf: 41 } },
         results: [res('0-30mph', '0–30 mph', 1.62, { rollout: 1.43 }), res('0-60mph', '0–60 mph', 3.41, { rollout: 3.22 }),
                   res('0-100mph', '0–100 mph', 7.95, { rollout: 7.76 }), res('eighth', '⅛ mile', 7.31, { kind: 'distance', rollout: 7.12, finishSpeed: 44.1 }),
                   res('0-50kmh', '0–50 km/h', 1.70, { rollout: 1.51 }), res('0-100kmh', '0–100 km/h', 3.55, { rollout: 3.36 }),

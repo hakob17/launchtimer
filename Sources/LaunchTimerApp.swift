@@ -3,17 +3,32 @@ import SwiftUI
 @main
 struct LaunchTimerApp: App {
     @StateObject private var model = AppModel()
+    @StateObject private var leaderboard = Leaderboard()
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environmentObject(model)
+                .environmentObject(leaderboard)
                 .preferredColorScheme(.dark)
+                .onAppear { connect() }
                 .tint(.orange)
         }
         .onChange(of: scenePhase) { phase in
             if phase == .active { model.becameActive() } else { model.resignedActive() }
+        }
+    }
+
+    /// Posts new runs automatically when the driver asked for that, and shows ranks on the car.
+    private func connect() {
+        let model = model, leaderboard = leaderboard
+        model.ranks = { leaderboard.posted[$0] }
+        model.onRunSaved = { run in
+            guard leaderboard.autoPost, leaderboard.acceptedTerms, leaderboard.car != nil, leaderboard.canPost(run) else { return }
+            Task {
+                if (try? await leaderboard.post(run)) != nil { model.pushRunsToCar() }
+            }
         }
     }
 }
@@ -25,6 +40,7 @@ struct RootView: View {
         TabView {
             DashView().tabItem { Label("Timer", systemImage: "gauge.with.dots.needle.67percent") }
             RunsView().tabItem { Label("Runs", systemImage: "list.bullet.rectangle") }
+            LeaderboardView().tabItem { Label("Leaderboard", systemImage: "trophy") }
             CarView().tabItem { Label("Car screen", systemImage: "car.fill") }
             SettingsView().tabItem { Label("Settings", systemImage: "gearshape") }
         }
