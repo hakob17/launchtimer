@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Launch Timer</title>
+<meta name="description" content="Live speed, 0–60 timer, g-meter and results from the Launch Timer iPhone app, on your car's screen.">
+<style>
+  :root {
+    --bg: #0b0c0f; --panel: #16181d; --line: #262a31; --text: #f4f5f7; --dim: #8b93a1;
+    --accent: #ff8a1f; --good: #34d399; --warn: #fbbf24; --blue: #60a5fa;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font-family: -apple-system, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif; overflow: hidden; }
+  .num { font-variant-numeric: tabular-nums; }
+
+  #app { display: grid; grid-template-columns: 1.25fr 1fr 0.95fr; grid-template-rows: auto 1fr auto; gap: 20px;
+    height: 100%; padding: 24px 28px; }
+  header { grid-column: 1 / -1; display: flex; align-items: center; gap: 16px; }
+  header h1 { font-size: 26px; margin: 0; letter-spacing: .02em; }
+  header h1 span { color: var(--accent); }
+  .chip { display: inline-flex; align-items: center; gap: 10px; padding: 8px 16px; border-radius: 999px;
+    font-weight: 600; font-size: 20px; background: #1f2229; }
+  .chip i { width: 12px; height: 12px; border-radius: 50%; background: var(--dim); display: inline-block; }
+  .spacer { flex: 1; }
+  button { font: inherit; color: var(--text); background: #232730; border: 1px solid var(--line); border-radius: 14px;
+    padding: 12px 20px; font-size: 19px; cursor: pointer; }
+  button:active { background: #2d323d; }
+
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 24px; padding: 24px; min-height: 0; }
+  #speedPanel { display: flex; flex-direction: column; justify-content: center; align-items: center; position: relative; }
+  #speed { font-size: 300px; font-weight: 800; line-height: .9; letter-spacing: -.04em; }
+  #unit { font-size: 34px; color: var(--dim); font-weight: 600; margin-top: 4px; }
+  #timer { font-size: 110px; font-weight: 800; color: var(--accent); margin-top: 18px; font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    min-height: 1.1em; }
+  #timerLabel { font-size: 22px; color: var(--dim); min-height: 1.3em; }
+
+  #gPanel { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; }
+  #gmeter { width: 100%; max-width: 560px; aspect-ratio: 1; }
+  #gnow { font-size: 64px; font-weight: 800; }
+  .peaks { display: flex; gap: 28px; font-size: 22px; color: var(--dim); }
+  .peaks b { color: var(--text); }
+
+  #history { grid-row: 2 / 4; grid-column: 3; display: flex; flex-direction: column; gap: 12px; overflow: hidden; }
+  #history h2, #detail h2 { margin: 0 0 4px; font-size: 22px; color: var(--dim); font-weight: 600; }
+  #runs { overflow-y: auto; display: flex; flex-direction: column; gap: 10px; flex: 1; }
+  .run { background: #1d2027; border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; cursor: pointer;
+    display: flex; justify-content: space-between; align-items: center; }
+  .run.sel { border-color: var(--accent); }
+  .run .t { font-size: 30px; font-weight: 800; }
+  .run .l { font-size: 17px; color: var(--dim); }
+  .empty { color: var(--dim); font-size: 20px; line-height: 1.4; }
+
+  #splits { grid-column: 1 / 3; display: grid; grid-template-columns: repeat(7, 1fr); gap: 12px; }
+  .split { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 14px 12px; text-align: center; }
+  .split .l { font-size: 18px; color: var(--dim); }
+  .split .v { font-size: 38px; font-weight: 800; margin-top: 4px; }
+  .split .d { font-size: 15px; color: var(--dim); min-height: 1.2em; }
+  .split.hit { border-color: var(--accent); }
+  .split.hit .v { color: var(--accent); }
+
+  #detail { position: fixed; inset: 0; background: rgba(0,0,0,.82); display: none; align-items: center; justify-content: center; }
+  #detail .box { width: min(1500px, 92vw); background: var(--panel); border: 1px solid var(--line); border-radius: 28px; padding: 28px;
+    display: grid; grid-template-columns: 1fr 1.6fr; gap: 28px; }
+  #detail table { width: 100%; border-collapse: collapse; font-size: 24px; }
+  #detail td { padding: 8px 0; border-bottom: 1px solid var(--line); }
+  #detail td:last-child { text-align: right; font-weight: 700; }
+  #detail .sub { color: var(--dim); font-size: 18px; }
+  #chart { width: 100%; height: 480px; }
+  .warn { color: var(--warn); font-size: 19px; margin-top: 10px; }
+
+  #pair { position: fixed; inset: 0; background: var(--bg); display: none; align-items: center; justify-content: center; flex-direction: column; gap: 22px; }
+  #pair h2 { font-size: 44px; margin: 0; }
+  #pair p { color: var(--dim); font-size: 22px; margin: 0; text-align: center; max-width: 900px; line-height: 1.4; }
+  #code { font: 700 64px ui-monospace, Menlo, monospace; letter-spacing: .12em; text-align: center; width: 620px;
+    background: #15171c; color: var(--text); border: 2px solid var(--line); border-radius: 20px; padding: 16px; text-transform: uppercase; }
+  #code:focus { outline: none; border-color: var(--accent); }
+  #pairErr { color: var(--warn); font-size: 20px; min-height: 1.3em; }
+  .big { font-size: 26px; padding: 16px 40px; background: var(--accent); color: #111; border: none; font-weight: 700; }
+  footer { position: fixed; right: 28px; bottom: 8px; font-size: 13px; color: #555c68; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>Launch <span>Timer</span></h1>
+    <div class="chip" id="phase"><i></i><span>Connecting…</span></div>
+    <div class="spacer"></div>
+    <button id="unitsBtn">km/h</button>
+    <button id="pairBtn">Pair phone</button>
+  </header>
+
+  <section class="panel" id="speedPanel">
+    <div id="speed" class="num">0</div>
+    <div id="unit">mph</div>
+    <div id="timer" class="num"></div>
+    <div id="timerLabel"></div>
+  </section>
+
+  <section class="panel" id="gPanel">
+    <canvas id="gmeter" width="920" height="920"></canvas>
+    <div id="gnow" class="num">0.00 g</div>
+    <div class="peaks"><span>Peak accel <b id="peakLon" class="num">0.00 g</b></span><span>Peak lateral <b id="peakLat" class="num">0.00 g</b></span></div>
+  </section>
+
+  <section class="panel" id="history">
+    <h2>Runs</h2>
+    <div id="runs"><div class="empty">Your runs show up here. Stop, wait for “Ready” on the phone, and launch.</div></div>
+  </section>
+
+  <section id="splits"></section>
+</div>
+
+<div id="detail"><div class="box">
+  <div><h2 id="detailTitle">Run</h2><table id="detailTable"></table><div id="detailWarn"></div>
+    <p><button id="closeDetail">Close</button></p></div>
+  <div><canvas id="chart" width="1600" height="960"></canvas></div>
+</div></div>
+
+<div id="pair">
+  <h2>Pair with your iPhone</h2>
+  <p>Open Launch Timer on the phone, tap <b>Car screen</b>, and type the code shown there.</p>
+  <input id="code" maxlength="9" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX">
+  <div id="pairErr"></div>
+  <button class="big" id="pairGo">Connect</button>
+  <p style="font-size:18px">Only time runs on a closed course or drag strip.</p>
+</div>
+
+<footer>Launch Timer · the phone does the timing; this page only shows it</footer>
+
+<script>
+(() => {
+  const RELAY = 'wss://teslanav-relay.hakob-hakobyan173.workers.dev/ws';
+  const MPH = 0.44704, KMH = 1 / 3.6;
+  const $ = id => document.getElementById(id);
+  const params = new URLSearchParams(location.search);
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+  };
+
+  // Split tiles shown for each unit system (braking lives in the run details).
+  const TILES = {
+    imperial: [['0-30mph', '0–30 mph'], ['0-60mph', '0–60 mph'], ['0-100mph', '0–100 mph'], ['0-130mph', '0–130 mph'],
+               ['60-130mph', '60–130 mph'], ['eighth', '⅛ mile'], ['quarter', '¼ mile']],
+    metric: [['0-50kmh', '0–50 km/h'], ['0-100kmh', '0–100 km/h'], ['0-150kmh', '0–150 km/h'], ['0-200kmh', '0–200 km/h'],
+             ['100-200kmh', '100–200 km/h'], ['201m', '201 m'], ['402m', '402 m']],
+  };
+  const SHOWN = {
+    imperial: new Set(['0-30mph', '0-60mph', '0-100mph', '0-130mph', '60-130mph', 'eighth', 'quarter', '60-0mph']),
+    metric: new Set(['0-50kmh', '0-100kmh', '0-150kmh', '0-200kmh', '100-200kmh', '201m', '402m', '100-0kmh']),
+  };
+  const HEADLINE = {
+    imperial: ['0-60mph', '60-130mph', 'quarter', '0-30mph', '60-0mph'],
+    metric: ['0-100kmh', '100-200kmh', '402m', '0-50kmh', '100-0kmh'],
+  };
+
+  let units = store.get('lt.units') || 'imperial';
+  let unitsFromPhone = !store.get('lt.units');
+  let rollout = true;
+  let runs = [], latestId = '', live = null, phoneOnline = false, connected = false;
+  const trail = [];
+
+  const spd = v => units === 'imperial' ? v / MPH : v / KMH;
+  const unitLabel = () => units === 'imperial' ? 'mph' : 'km/h';
+  const fmtT = t => t == null ? '—' : t.toFixed(2);
+  const timeOf = r => rollout && r.rollout != null ? r.rollout : r.time;
+  const detailOf = r => r.finishSpeed != null ? `@ ${Math.round(spd(r.finishSpeed))} ${unitLabel()}`
+    : r.distance != null ? (units === 'imperial' ? `${(r.distance / 0.3048).toFixed(0)} ft` : `${r.distance.toFixed(1)} m`) : '';
+
+  // ---------- tiles ----------
+  function renderTiles() {
+    const el = $('splits');
+    el.innerHTML = '';
+    const latest = runs.find(r => r.id === latestId) || null;
+    for (const [id, label] of TILES[units]) {
+      const tile = document.createElement('div');
+      tile.className = 'split';
+      let value = '—', detail = '';
+      if (live && live.phase === 'running') {
+        if (live.splits && live.splits[id] != null) { value = fmtT(live.splits[id]); tile.classList.add('hit'); }
+      } else if (latest) {
+        const r = latest.results.find(x => x.id === id);
+        if (r) { value = fmtT(timeOf(r)); detail = detailOf(r); tile.classList.add('hit'); }
+      }
+      tile.innerHTML = `<div class="l">${label}</div><div class="v num">${value}</div><div class="d">${detail}</div>`;
+      el.appendChild(tile);
+    }
+  }
+
+  // ---------- live ----------
+  function setPhase(text, color) {
+    const chip = $('phase');
+    chip.querySelector('span').textContent = text;
+    chip.querySelector('i').style.background = color;
+  }
+
+  function renderLive() {
+    if (!connected) return setPhase('Connecting…', 'var(--dim)');
+    if (!phoneOnline) return setPhase('Open Launch Timer on the phone', 'var(--dim)');
+    if (!live) return setPhase('Waiting for the phone…', 'var(--dim)');
+    const phases = {
+      calibrating: ['Hold still to calibrate', 'var(--warn)'],
+      ready: ['Ready — launch when you want', 'var(--good)'],
+      running: ['Timing…', 'var(--accent)'],
+      moving: ['Driving', 'var(--blue)'],
+    };
+    const [text, color] = phases[live.phase] || ['—', 'var(--dim)'];
+    setPhase(live.demo && live.phase !== 'running' ? 'Demo — ' + text : text, color);
+    $('speed').textContent = Math.round(spd(live.v));
+    $('unit').textContent = unitLabel();
+    $('peakLon').textContent = (live.peakLon || 0).toFixed(2) + ' g';
+    $('peakLat').textContent = (live.peakLat || 0).toFixed(2) + ' g';
+    if (live.phase === 'running' && live.rt != null) {
+      $('timer').textContent = live.rt.toFixed(2);
+      $('timerLabel').textContent = 'seconds';
+    } else {
+      const latest = runs.find(r => r.id === latestId);
+      const head = latest && headline(latest);
+      $('timer').textContent = head ? fmtT(timeOf(head)) : '';
+      $('timerLabel').textContent = head ? head.label + (detailOf(head) ? ' · ' + detailOf(head) : '') : '';
+    }
+    trail.push([live.lon, live.lat]);
+    if (trail.length > 30) trail.shift();
+    drawG(live.lon, live.lat);
+    renderTiles();
+  }
+
+  function headline(run) {
+    for (const id of HEADLINE[units]) {
+      const r = run.results.find(x => x.id === id);
+      if (r) return r;
+    }
+    return null;
+  }
+
+  // ---------- g-meter ----------
+  function drawG(lon, lat) {
+    const c = $('gmeter'), g = c.getContext('2d');
+    const w = c.width, r = w / 2 - 40, cx = w / 2, cy = w / 2, range = 1.2;
+    g.clearRect(0, 0, w, w);
+    g.strokeStyle = 'rgba(255,255,255,.14)'; g.lineWidth = 3;
+    for (const ring of [0.5, 1.0]) { g.beginPath(); g.arc(cx, cy, ring / range * r, 0, Math.PI * 2); g.stroke(); }
+    g.strokeStyle = 'rgba(255,255,255,.08)';
+    g.beginPath(); g.moveTo(cx - r, cy); g.lineTo(cx + r, cy); g.moveTo(cx, cy - r); g.lineTo(cx, cy + r); g.stroke();
+    g.fillStyle = '#8b93a1'; g.font = '38px -apple-system, sans-serif'; g.textAlign = 'left';
+    g.fillText('0.5 g', cx + 0.5 / range * r * 0.72 + 8, cy - 0.5 / range * r * 0.72 - 8);
+    g.fillText('1 g', cx + 1 / range * r * 0.72 + 8, cy - 1 / range * r * 0.72 - 8);
+    g.textAlign = 'center'; g.fillText('ACCEL', cx, 34); g.fillText('BRAKE', cx, w - 8);
+    const pt = (a, b) => [cx + b / range * r, cy - a / range * r];
+    trail.forEach(([a, b], i) => {
+      const [x, y] = pt(a, b);
+      g.fillStyle = `rgba(255,138,31,${(i / trail.length) * 0.5})`;
+      g.beginPath(); g.arc(x, y, 14, 0, Math.PI * 2); g.fill();
+    });
+    const [x, y] = pt(lon, lat);
+    g.fillStyle = '#ff8a1f'; g.beginPath(); g.arc(x, y, 34, 0, Math.PI * 2); g.fill();
+    $('gnow').textContent = Math.hypot(lon, lat).toFixed(2) + ' g';
+  }
+
+  // ---------- history ----------
+  function kindTitle(run) {
+    if (run.kind === 'braking') return 'Braking';
+    if (run.kind === 'rolling') return 'Rolling pull';
+    return `Launch · ${Math.round(spd(run.maxSpeed))} ${unitLabel()}`;
+  }
+
+  function renderRuns() {
+    const el = $('runs');
+    if (!runs.length) {
+      el.innerHTML = '<div class="empty">Your runs show up here. Stop, wait for “Ready” on the phone, and launch.</div>';
+      return;
+    }
+    el.innerHTML = '';
+    for (const run of runs) {
+      const head = headline(run);
+      const item = document.createElement('div');
+      item.className = 'run' + (run.id === latestId ? ' sel' : '');
+      const when = new Date(run.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      item.innerHTML = `<div><div>${kindTitle(run)}</div><div class="l">${when}${run.source !== 'iPhone' ? ' · ' + run.source : ''}</div></div>
+        <div style="text-align:right"><div class="t num">${head ? fmtT(timeOf(head)) : '—'}</div><div class="l">${head ? head.label : ''}</div></div>`;
+      item.onclick = () => openDetail(run);
+      el.appendChild(item);
+    }
+  }
+
+  function openDetail(run) {
+    $('detailTitle').textContent = kindTitle(run);
+    const rows = run.results.filter(r => SHOWN[units].has(r.id)).map(r => {
+      const alt = r.rollout != null ? `<div class="sub">${rollout ? 'without' : 'with'} 1-ft rollout ${fmtT(rollout ? r.time : r.rollout)} s</div>` : '';
+      return `<tr><td>${r.label}${alt}</td><td class="num">${fmtT(timeOf(r))} s <span class="sub">${detailOf(r)}</span></td></tr>`;
+    });
+    if (run.kind !== 'braking') rows.push(`<tr><td>Top speed</td><td class="num">${Math.round(spd(run.maxSpeed))} ${unitLabel()}</td></tr>`);
+    rows.push(`<tr><td>${run.kind === 'braking' ? 'Peak braking' : 'Peak acceleration'}</td><td class="num">${run.peakG.toFixed(2)} g</td></tr>`);
+    $('detailTable').innerHTML = rows.join('');
+    $('detailWarn').innerHTML = run.grade != null && Math.abs(run.grade) > 0.01
+      ? `<div class="warn">⚠︎ ${(Math.abs(run.grade) * 100).toFixed(1)}% ${run.grade < 0 ? 'downhill' : 'uphill'} — not comparable with flat runs</div>` : '';
+    $('detail').style.display = 'flex';
+    drawChart(run);
+  }
+
+  function drawChart(run) {
+    const c = $('chart'), g = c.getContext('2d');
+    const W = c.width, H = c.height, L = 110, B = 80, T = 30, R = 30;
+    g.clearRect(0, 0, W, H);
+    const pts = run.trace;
+    if (!pts.length) return;
+    const tMax = pts[pts.length - 1][0] || 1;
+    const vMax = Math.max(...pts.map(p => spd(p[1]))) * 1.08 || 1;
+    const X = t => L + t / tMax * (W - L - R), Y = v => H - B - v / vMax * (H - B - T);
+    g.strokeStyle = 'rgba(255,255,255,.08)'; g.fillStyle = '#8b93a1'; g.font = '30px -apple-system, sans-serif'; g.lineWidth = 2;
+    const vStep = vMax > 150 ? 50 : vMax > 60 ? 20 : 10;
+    for (let v = 0; v <= vMax; v += vStep) {
+      g.beginPath(); g.moveTo(L, Y(v)); g.lineTo(W - R, Y(v)); g.stroke();
+      g.textAlign = 'right'; g.fillText(v, L - 16, Y(v) + 10);
+    }
+    const tStep = tMax > 20 ? 5 : tMax > 8 ? 2 : 1;
+    for (let t = 0; t <= tMax; t += tStep) { g.textAlign = 'center'; g.fillText(t + ' s', X(t), H - B + 44); }
+    g.strokeStyle = '#ff8a1f'; g.lineWidth = 6; g.beginPath();
+    pts.forEach(([t, v], i) => (i ? g.lineTo(X(t), Y(spd(v))) : g.moveTo(X(t), Y(spd(v)))));
+    g.stroke();
+    g.fillStyle = '#8b93a1'; g.textAlign = 'left'; g.fillText(unitLabel(), L + 12, T + 24);
+  }
+
+  $('closeDetail').onclick = () => { $('detail').style.display = 'none'; };
+  $('detail').onclick = e => { if (e.target === $('detail')) $('detail').style.display = 'none'; };
+
+  // ---------- units ----------
+  function applyUnits() {
+    $('unitsBtn').textContent = units === 'imperial' ? 'km/h' : 'mph';
+    $('unit').textContent = unitLabel();
+    renderTiles(); renderRuns(); renderLive();
+  }
+  $('unitsBtn').onclick = () => {
+    units = units === 'imperial' ? 'metric' : 'imperial';
+    unitsFromPhone = false;
+    store.set('lt.units', units);
+    applyUnits();
+  };
+
+  // ---------- pairing & relay ----------
+  const ALPHABET = /^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{8}$/;
+  let room = (params.get('code') || store.get('lt.code') || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  let ws = null, retry = null;
+
+  function showPair(message) {
+    $('pair').style.display = 'flex';
+    $('pairErr').textContent = message || '';
+    $('code').value = room ? room.slice(0, 4) + '-' + room.slice(4) : '';
+    setTimeout(() => $('code').focus(), 50);
+  }
+  $('pairBtn').onclick = () => showPair();
+  $('code').oninput = () => {
+    let v = $('code').value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
+    $('code').value = v.length > 4 ? v.slice(0, 4) + '-' + v.slice(4) : v;
+  };
+  $('code').onkeydown = e => { if (e.key === 'Enter') $('pairGo').click(); };
+  $('pairGo').onclick = () => {
+    const v = $('code').value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (!ALPHABET.test(v)) { $('pairErr').textContent = 'The code has 8 letters and digits, like ABCD-2345.'; return; }
+    room = v; store.set('lt.code', v);
+    $('pair').style.display = 'none';
+    runs = []; latestId = ''; live = null; renderRuns(); renderTiles();
+    connect();
+  };
+
+  function connect() {
+    clearTimeout(retry);
+    if (ws) { ws.onclose = null; ws.close(); }
+    connected = false; renderLive();
+    ws = new WebSocket(`${RELAY}?room=${room}&role=car`);
+    ws.onopen = () => { connected = true; ws.send(JSON.stringify({ type: 'hello' })); renderLive(); };
+    ws.onmessage = e => {
+      if (typeof e.data !== 'string') return;
+      let m; try { m = JSON.parse(e.data); } catch { return; }
+      if (m.type === 'phone') { phoneOnline = m.online; if (m.online) ws.send(JSON.stringify({ type: 'hello' })); renderLive(); }
+      if (m.type === 'live') {
+        phoneOnline = true;
+        if (unitsFromPhone && m.units && m.units !== units) { units = m.units; applyUnits(); }
+        live = m; renderLive();
+      }
+      if (m.type === 'runs') {
+        runs = m.runs || []; latestId = m.latest || ''; rollout = m.rollout !== false;
+        if (unitsFromPhone && m.units && m.units !== units) { units = m.units; applyUnits(); }
+        renderRuns(); renderTiles(); renderLive();
+      }
+    };
+    ws.onclose = () => { connected = false; renderLive(); retry = setTimeout(connect, 2000); };
+  }
+
+  // ---------- preview without a phone (?preview) ----------
+  function preview() {
+    connected = true; phoneOnline = true;
+    const trace = []; let v = 0;
+    for (let t = 0; t <= 9; t += 0.1) { const a = Math.min(0.95, 19 / Math.max(v, 0.1)) * 9.81; v += a * 0.1; trace.push([+t.toFixed(1), v, a / 9.81]); }
+    const res = (id, label, time, extra = {}) => Object.assign({ id, label, kind: 'speed', time }, extra);
+    runs = [
+      { id: 'a', kind: 'launch', date: Date.now() - 60000, maxSpeed: 52.5, peakG: 0.97, distance: 390, source: 'iPhone', grade: 0.002, trace,
+        results: [res('0-30mph', '0–30 mph', 1.62, { rollout: 1.43 }), res('0-60mph', '0–60 mph', 3.41, { rollout: 3.22 }),
+                  res('0-100mph', '0–100 mph', 7.95, { rollout: 7.76 }), res('eighth', '⅛ mile', 7.31, { kind: 'distance', rollout: 7.12, finishSpeed: 44.1 }),
+                  res('0-50kmh', '0–50 km/h', 1.70, { rollout: 1.51 }), res('0-100kmh', '0–100 km/h', 3.55, { rollout: 3.36 }),
+                  res('0-150kmh', '0–150 km/h', 6.41, { rollout: 6.22 }), res('201m', '201 m', 7.30, { kind: 'distance', rollout: 7.11, finishSpeed: 44.0 })] },
+      { id: 'b', kind: 'braking', date: Date.now() - 30000, maxSpeed: 30, peakG: 1.02, distance: 40, source: 'iPhone', trace,
+        results: [res('60-0mph', '60–0 mph', 2.81, { kind: 'braking', distance: 36.4 }), res('100-0kmh', '100–0 km/h', 2.95, { kind: 'braking', distance: 39.2 })] },
+    ];
+    latestId = 'a';
+    renderRuns();
+    const t0 = performance.now();
+    setInterval(() => {
+      const t = ((performance.now() - t0) / 1000) % 14;
+      let m;
+      if (t < 3) m = { phase: 'ready', v: 0, lon: 0, lat: 0 };
+      else if (t < 11) {
+        const rt = t - 3, p = trace[Math.min(trace.length - 1, Math.round(rt * 10))];
+        const splits = {};
+        runs[0].results.forEach(r => { if (r.kind !== 'braking' && r.time <= rt) splits[r.id] = r.time; });
+        m = { phase: 'running', v: p[1], lon: p[2], lat: 0.05 * Math.sin(t * 2), rt, splits };
+      } else m = { phase: 'moving', v: 45 - (t - 11) * 9, lon: -0.9, lat: 0 };
+      live = Object.assign({ peakLon: 0.97, peakLat: 0.12, units }, m);
+      renderLive();
+    }, 100);
+  }
+
+  applyUnits();
+  if (params.has('preview')) preview();
+  else if (ALPHABET.test(room)) connect();
+  else showPair();
+})();
+</script>
+</body>
+</html>

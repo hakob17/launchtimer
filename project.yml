@@ -1,0 +1,35 @@
+name: LaunchTimer
+options:
+  bundleIdPrefix: com.hakobhakobyan
+  deploymentTarget:
+    iOS: "16.0"
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    DEVELOPMENT_TEAM: SXEFA57E5G
+    CODE_SIGN_STYLE: Automatic
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  # The app: sensors → LaunchEngine (Core, shared with the Mac test harness) → dashboard,
+  # run history, and the car screen through the relay.
+  LaunchTimer:
+    type: application
+    platform: iOS
+    sources:
+      - Sources
+      - Core
+    info:
+      path: Sources/Info.plist
+      properties:
+        CFBundleDisplayName: Launch Timer
+        ITSAppUsesNonExemptEncryption: false
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        NSLocationWhenInUseUsageDescription: GPS speed keeps your 0–60, quarter-mile and braking times accurate.
+        NSMotionUsageDescription: The motion sensors and barometer measure acceleration, braking and slope during a run.
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.hakobhakobyan.launchtimer
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        TARGETED_DEVICE_FAMILY: "1"
